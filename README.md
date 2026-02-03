@@ -1,10 +1,17 @@
 # Vibe Code Security Guide
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Claude Code Skill](https://img.shields.io/badge/Claude%20Code-Skill-blue)](https://github.com/BTECHK/vibe-coded-vibe-code-security-guide)
+
 > **A comprehensive, platform-agnostic security reference for AI-assisted development**
 >
-> Created for web and mobile applications built with AI coding assistants (Cursor, Claude Code, Lovable, Bolt, v0, Replit Agent, etc.)
+> Includes a Claude Code skill (`check-your-vibe`) for automated security audits
 
-A security checklist I built as a personal learning project, synthesizing research from [Databricks, Replit, Supabase, OWASP, and others](./sources.md), then iterating with multiple LLMs to pressure-test coverage.
+Created for web and mobile applications built with AI coding assistants (Cursor, Claude Code, Lovable, Bolt, v0, Replit Agent, etc.)
+
+A security checklist synthesizing research from [Databricks, Replit, Supabase, OWASP, and others](./sources.md), pressure-tested across multiple LLMs.
+
+**GitHub Topics:** `security` `vibe-coding` `ai-security` `claude-code` `claude-skill` `owasp` `supabase` `firebase` `nextjs`
 
 ---
 
@@ -634,15 +641,34 @@ Provide specific policy corrections if issues are found.
 
 ---
 
-## Future: Claude Skill
+## Claude Code Skill
 
-This guide will become a Claude skill with sub-commands:
+This guide is available as a Claude Code skill with the following commands:
 
 | Command | Behavior |
 |---------|----------|
-| `/vibe-security:review` | Audit current codebase against this checklist |
-| `/vibe-security:preflight` | Interactive pre-deployment walkthrough |
-| `/vibe-security:mode` | Inject security principles into session context |
+| `/check-your-vibe:review` | Run a structured security audit against vibe-coding-specific vulnerabilities |
+| `/check-your-vibe:preflight` | Interactive pre-deployment security gate with go/no-go questions |
+| `/check-your-vibe:mode` | Inject security-conscious coding principles into the current session |
+
+### Installation
+
+Copy the `check-your-vibe` skill folder to your Claude Code skills directory:
+
+```bash
+# macOS/Linux
+cp -r check-your-vibe ~/.claude/skills/
+
+# Windows
+xcopy /E check-your-vibe %USERPROFILE%\.claude\skills\check-your-vibe\
+```
+
+Or clone directly from the repository:
+
+```bash
+git clone https://github.com/BTECHK/vibe-coded-vibe-code-security-guide.git
+cp -r vibe-coded-vibe-code-security-guide/check-your-vibe ~/.claude/skills/
+```
 
 ---
 
