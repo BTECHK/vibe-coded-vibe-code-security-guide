@@ -170,13 +170,22 @@ A security checklist synthesizing research from [Databricks, Replit, Supabase, O
 
 - [ ] **Implement Secure Session Management** — Use `HttpOnly`, `Secure`, `SameSite=Strict` cookie flags. Regenerate session ID after login.
 
+- [ ] **Set Explicit Session/Token Lifetimes** — Never-expiring sessions mean stolen tokens work forever. Concrete targets:
+  - **Access tokens (JWT):** 15–60 minutes
+  - **Refresh tokens:** 7–30 days, rotate on each use (detect reuse → revoke the whole chain)
+  - **Idle timeout:** 30 minutes for sensitive apps, 24 hours otherwise
+  - **Absolute timeout:** 7–30 days max, forcing full re-auth
+  - If AI-generated code sets `expiresIn: '1y'`, `maxAge: Infinity`, or no expiration at all, push back and set real values.
+
+- [ ] **Logout Must Revoke Server-Side** — Deleting the cookie client-side is *not* logout — the token is still valid if an attacker already stole it. Destroy the server-side session record (database/Redis session store) on logout. For stateless JWTs, either (a) keep access token TTL very short (≤15 min) so logout is "eventually enforced" via expiration, or (b) maintain a denylist in Redis with TTL equal to the token's remaining lifetime. Test: copy a cookie, log out in one tab, replay the cookie in another — it should fail.
+
 - [ ] **Protect Authentication Endpoints** — Rate limit login attempts (5-10 per minute per IP). Implement account lockout after failures. Use CAPTCHA for signup/login.
 
 ### MEDIUM Priority
 
 - [ ] **Implement Multi-Factor Authentication (MFA)** — Especially for admin accounts. TOTP or WebAuthn/Passkeys.
 - [ ] **Secure Password Reset Flow** — Time-limited tokens (15-60 minutes), single-use, don't reveal if email exists
-- [ ] **JWT Best Practices** — Use strong secrets (256+ bits), validate `iss`/`aud`/`exp`, never use `alg: none`, don't store sensitive data in payload
+- [ ] **JWT Best Practices** — Use strong secrets (256+ bits, generated with `openssl rand -base64 32` or equivalent), validate `iss`/`aud`/`exp`, never use `alg: none`, don't store sensitive data in payload. **Never ship placeholder secrets** — AI-generated code and tutorials frequently contain `"your-secret-key"`, `"changeme"`, `"secret"`, or `"supersecret"`. Attackers test common/leaked secrets first; a predictable signing key means forged admin tokens. Grep your repo for the JWT secret variable before every deploy.
 - [ ] **Secure OAuth Implementation** — Always validate `state` parameter (CSRF), validate redirect URIs strictly, use PKCE for public clients
 
 ### LOW Priority
@@ -304,7 +313,7 @@ A security checklist synthesizing research from [Databricks, Replit, Supabase, O
 
 - [ ] **CSRF Protection** — Use anti-CSRF tokens for forms. `SameSite=Strict` cookies help.
 - [ ] **Prevent Clickjacking** — Set `X-Frame-Options: DENY` or CSP `frame-ancestors 'none'`
-- [ ] **Prevent Open Redirects** — Validate redirect targets against an allowlist
+- [ ] **Prevent Open Redirects** — Validate redirect targets against an allowlist of paths or domains you control. A `?redirect=` parameter that accepts any URL is not just a phishing tool — it chains into OAuth/SSO flows to steal auth codes and tokens *after* a legitimate login (user logs in on your real domain, gets redirected to attacker-controlled URL with the token in the fragment). Prefer relative paths (`/dashboard`) over full URLs; if you must accept URLs, strictly match against an allowlist and reject anything else.
 
 ### LOW Priority
 
@@ -355,6 +364,7 @@ A security checklist synthesizing research from [Databricks, Replit, Supabase, O
 - [ ] **Principle of Least Privilege** — Application database users should have minimal permissions. Don't use root/admin credentials.
 - [ ] **Enable RLS (Supabase/Postgres)** — Test policies thoroughly
 - [ ] **Secure Connection Strings** — Use SSL/TLS. Connection strings in environment variables only.
+- [ ] **Never Expose Databases to the Public Internet** — Self-hosted Postgres/MongoDB/Redis/Elasticsearch must not bind to `0.0.0.0` without a firewall in front. Default to `127.0.0.1` or a private VPC network. Attackers continuously scan for open ports `5432`/`3306`/`27017`/`6379`/`9200` — a publicly reachable database with weak or default credentials is typically compromised within hours. Managed DBs (Supabase, Neon, PlanetScale, RDS) handle this for you, but verify the connection requires authentication and TLS. If AI helped you migrate from managed to self-hosted, audit the bind address and firewall rules explicitly.
 
 ### MEDIUM Priority
 
@@ -389,6 +399,8 @@ A security checklist synthesizing research from [Databricks, Replit, Supabase, O
 - [ ] **Lock Dependency Versions** — Use lockfiles (`package-lock.json`, `yarn.lock`). Commit to version control.
 
 - [ ] **Lockfile Poisoning Check** — If AI agent fixes build errors, it might force-update dependencies or delete your lockfile. Treat lockfile changes as code changes. Review diffs manually.
+
+- [ ] **Beware Install-Time Code Execution** — `npm install` runs arbitrary JavaScript from *every* dependency via `preinstall`/`install`/`postinstall` lifecycle scripts — *before your own code has run a single line*. A malicious or typosquatted package can steal environment variables, modify files, or install backdoors during install. Mitigations: set `ignore-scripts=true` in `.npmrc` and only opt in for packages you've vetted (`npm rebuild <pkg>`); `pnpm` blocks lifecycle scripts by default since v9 and requires explicit approval; `bun install` also restricts them. This is especially important when AI suggests unfamiliar packages — the typosquat doesn't need you to *use* it, only to *install* it.
 
 ### MEDIUM Priority
 
