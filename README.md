@@ -341,6 +341,25 @@ A security checklist synthesizing research from [Databricks, Replit, Supabase, O
 
 - [ ] **Secure Error Handling** — Don't expose stack traces, file paths, or SQL errors. Log detailed errors server-side, return generic messages to clients.
 
+- [ ] **Enforce Request Size Limits** — Without body size limits, an attacker can POST a massive payload and OOM your server. Set explicit limits on every endpoint that accepts a body.
+  ```javascript
+  // Express
+  app.use(express.json({ limit: '100kb' }));
+  app.use(express.urlencoded({ limit: '100kb', extended: true }));
+
+  // Next.js API route (app router)
+  export const config = { api: { bodyParser: { sizeLimit: '100kb' } } };
+
+  // FastAPI
+  from fastapi import Request
+  @app.middleware("http")
+  async def limit_body(request: Request, call_next):
+      if int(request.headers.get("content-length", 0)) > 102400:
+          return JSONResponse(status_code=413, content={"error": "Payload too large"})
+      return await call_next(request)
+  ```
+  File upload endpoints can have higher limits, but set them explicitly per route rather than raising the global default.
+
 ### MEDIUM Priority
 
 - [ ] **Configure CORS Properly** — Don't use `*` for credentials requests. Whitelist specific origins.
@@ -502,13 +521,38 @@ See **[AI Agent Security](./ai-agent-security.md)** for expanded guidance on Mol
 
 ### HIGH Priority
 
-- [ ] **Enable Logging** — Authentication events, authorization failures, API errors. Don't log sensitive data.
-- [ ] **Set Up Alerts** — Multiple failed login attempts, unusual API patterns, error rate spikes
+- [ ] **Enable Logging** — Authentication events, authorization failures, API errors. **Never log passwords, tokens, session IDs, or PII.** Redact or mask sensitive fields before they hit the log pipeline.
+  ```javascript
+  // What to log
+  logger.warn('login_failed', { ip, email, attempt_count, user_agent });
+  logger.info('authz_denied', { user_id, resource, action, reason });
+  logger.error('api_error', { endpoint, status_code, request_id });
+
+  // What NOT to log
+  // logger.info('login', { email, password });        // NEVER
+  // logger.debug('token', { jwt: token });             // NEVER
+  // logger.error('db_error', { query, connection_string }); // NEVER
+  ```
+
+- [ ] **Set Up Alerting with Concrete Thresholds** — Alerts should catch patterns before they become breaches. Start with these baselines and tune for your traffic:
+
+  | Signal | Threshold | Why |
+  |--------|-----------|-----|
+  | Failed logins (single IP) | >10 in 5 minutes | Credential stuffing / brute force |
+  | Failed logins (single account) | >5 in 10 minutes | Targeted account attack |
+  | 4xx spike (single IP) | >50 in 1 minute | Scanning / fuzzing |
+  | 5xx error rate | >5% of requests in 5 minutes | App instability or exploitation |
+  | Auth token failures | >20 in 5 minutes | Stolen/expired token replay |
+  | Response size anomaly | Single response >10x avg | Possible data exfiltration |
+  | New admin account created | Any | Privilege escalation attempt |
+  | API usage outside business hours | Unusual volume | Compromised credentials |
+
+  Most platforms (Datadog, Sentry, CloudWatch, even Uptime Robot) support threshold-based alerts. At minimum, set up email/Slack alerts for the top three rows.
 
 ### MEDIUM Priority
 
 - [ ] **Create Incident Response Plan** — Contact information, containment procedures, communication templates
-- [ ] **Regular Log Review** — Weekly at minimum
+- [ ] **Regular Log Review** — Weekly at minimum. Look for: repeated 403s from the same user, logins from new geolocations, and endpoints receiving unusual traffic volumes.
 
 ### LOW Priority
 
